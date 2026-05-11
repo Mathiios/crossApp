@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "35963886162",
+    "project_id": "crossapp-7accc",
+    "storage_bucket": "crossapp-7accc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:35963886162:android:caf334326945d5e91f5d8b",
+        "android_client_info": {
+          "package_name": "com.unipac.crossApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMfIl2ATGMX5uplBMnsqp31dh2_Lq4Gbg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
