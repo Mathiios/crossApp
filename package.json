@@ -6,7 +6,12 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test": "jest --forceExit",
+    "test:unit": "jest --forceExit --testPathPattern=\"src/.*__tests__\"",
+    "test:integration": "jest --forceExit --testPathPattern=\"__tests__/integration\"",
+    "test:system": "jest --forceExit --testPathPattern=\"__tests__/system\"",
+    "test:coverage": "jest --forceExit --coverage"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -16,6 +21,7 @@
     "@react-navigation/native-stack": "^6.11.0",
     "expo": "^54.0.34",
     "expo-linear-gradient": "~15.0.8",
+    "expo-navigation-bar": "~5.0.10",
     "expo-status-bar": "~3.0.9",
     "firebase": "^11.10.0",
     "react": "19.1.0",
@@ -26,7 +32,13 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.24.0"
+    "@babel/core": "^7.24.0",
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^14.0.0",
+    "jest": "^29.7.0",
+    "jest-expo": "^56.0.4",
+    "react-test-renderer": "^19.1.0",
+    "test-renderer": "^1.2.0"
   },
   "private": true
 }
