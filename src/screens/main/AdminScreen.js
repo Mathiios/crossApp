@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Modal, SafeAreaView,
+  ActivityIndicator, Modal, SafeAreaView, TextInput,
 } from 'react-native';
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
+import { validateUID, validateRole } from '../../utils/inputValidation';
 
 const ROLES = [
   { key: 'aluno',     label: 'Aluno',        color: '#3B82F6' },
@@ -21,6 +22,7 @@ export default function AdminScreen() {
   const [updating, setUpdating]     = useState(null);
   const [message, setMessage]       = useState({ text: '', type: '' });
   const [pendingDelete, setPendingDelete] = useState(null); // { uid, name }
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -48,6 +50,20 @@ export default function AdminScreen() {
       showMsg('Voce nao pode alterar seu proprio role.', 'error');
       return;
     }
+
+    // Validação de segurança
+    const uidCheck = validateUID(uid);
+    if (!uidCheck.valid) {
+      showMsg('UID inválido.', 'error');
+      return;
+    }
+
+    const roleCheck = validateRole(newRole);
+    if (!roleCheck.valid) {
+      showMsg(roleCheck.error, 'error');
+      return;
+    }
+
     setUpdating(uid);
     try {
       await updateDoc(doc(db, 'users', uid), { role: newRole });
@@ -65,6 +81,14 @@ export default function AdminScreen() {
       showMsg('Voce nao pode excluir sua propria conta.', 'error');
       return;
     }
+
+    // Validação de segurança
+    const uidCheck = validateUID(uid);
+    if (!uidCheck.valid) {
+      showMsg('UID inválido.', 'error');
+      return;
+    }
+
     setPendingDelete({ uid, name: userName });
   };
 
@@ -77,10 +101,24 @@ export default function AdminScreen() {
     setUpdating(uid);
     try {
       const deleteFn = httpsCallable(functions, 'deleteUserAccount');
-      await deleteFn({ uid });
-      showMsg(`${name} foi excluido. E-mail liberado para reutilizacao.`);
+      const result = await deleteFn({ uid });
+      const authInfo = result?.data?.authDeleted
+        ? 'E-mail liberado para reutilizacao.'
+        : 'Dados removidos.';
+      showMsg(`${name} foi excluido. ${authInfo}`);
     } catch(e) {
-      const msg = e?.message || e?.code || 'Erro desconhecido';
+      console.error('Erro ao excluir usuario:', e);
+      // httpsCallable erros vêm em e.code (ex: "functions/internal") e e.message
+      let msg = 'Erro desconhecido ao excluir usuario.';
+      if (e?.code === 'functions/not-found') {
+        msg = 'Cloud Function nao encontrada. Verifique se foi deployada.';
+      } else if (e?.code === 'functions/permission-denied') {
+        msg = 'Voce nao tem permissao para esta acao.';
+      } else if (e?.code === 'functions/unauthenticated') {
+        msg = 'Sessao expirada. Faca login novamente.';
+      } else if (e?.message) {
+        msg = e.message;
+      }
       showMsg(`Erro: ${msg}`, 'error');
     } finally {
       setUpdating(null);
@@ -88,6 +126,15 @@ export default function AdminScreen() {
   };
 
   const getRoleInfo = (role) => ROLES.find(r => r.key === role) || ROLES[0];
+
+  // Filtragem por pesquisa
+  const filteredUsers = users.filter((u) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    const name = (u.name || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    return name.includes(q) || email.includes(q);
+  });
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -100,6 +147,35 @@ export default function AdminScreen() {
             {users.length} cadastrado{users.length !== 1 ? 's' : ''}
           </Text>
         </View>
+
+        {/* Barra de Pesquisa */}
+        <View style={styles.searchContainer}>
+          <View style={styles.searchIconBox}>
+            <Text style={styles.searchIconText}>🔍</Text>
+          </View>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar por nome ou e-mail..."
+            placeholderTextColor="#BBBBBB"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity
+              style={styles.searchClearBtn}
+              onPress={() => setSearchQuery('')}
+            >
+              <Text style={styles.searchClearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {searchQuery.trim().length > 0 && (
+          <Text style={styles.searchResultText}>
+            {filteredUsers.length} resultado{filteredUsers.length !== 1 ? 's' : ''} encontrado{filteredUsers.length !== 1 ? 's' : ''}
+          </Text>
+        )}
 
         {/* Legenda de roles */}
         <View style={styles.legendRow}>
@@ -137,7 +213,7 @@ export default function AdminScreen() {
           <Text style={styles.emptyText}>Nenhum usuario cadastrado.</Text>
         ) : (
           <View style={styles.userList}>
-            {users.map((u) => {
+            {filteredUsers.map((u) => {
               const roleInfo = getRoleInfo(u.role);
               const isSelf    = u.uid === currentUser.uid;
               const isUpdating = updating === u.uid;
@@ -257,6 +333,47 @@ const styles = StyleSheet.create({
   header: { paddingTop: 20, paddingBottom: 16 },
   headerTitle: { color: '#1A1A1A', fontSize: 26, fontWeight: '900' },
   headerSubtitle: { color: '#888', fontSize: 13, marginTop: 4 },
+
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#EBEBEB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  searchIconBox: { marginRight: 8 },
+  searchIconText: { fontSize: 16 },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1A1A1A',
+    paddingVertical: 10,
+  },
+  searchClearBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F0F0F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  searchClearText: { color: '#888', fontSize: 13, fontWeight: '700' },
+  searchResultText: {
+    color: '#888',
+    fontSize: 12,
+    marginBottom: 10,
+    fontStyle: 'italic',
+  },
 
   legendRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
   legendItem: {
