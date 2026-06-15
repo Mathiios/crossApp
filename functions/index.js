@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const functions = require('firebase-functions/v1');
 const { initializeApp } = require('firebase-admin/app');
 const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
@@ -6,7 +6,11 @@ const { getFirestore } = require('firebase-admin/firestore');
 initializeApp();
 
 /**
- * deleteUserAccount
+ * deleteUserAccount (v1 — Cloud Functions 1ª geração)
+ *
+ * Usa v1 porque Cloud Functions v2 roda no Cloud Run, que exige
+ * autenticação IAM adicional e bloqueia chamadas de httpsCallable.
+ * Com v1, o Firebase Auth token enviado pelo app é suficiente.
  *
  * Função que:
  * 1. Verifica que o chamador está autenticado e é admin
@@ -17,33 +21,24 @@ initializeApp();
  * o e-mail, pois o Firebase Auth é um sistema separado. Sempre use
  * esta função para exclusão completa.
  */
-exports.deleteUserAccount = onCall(
-  {
-    region: 'us-central1',
-    // Permite chamadas autenticadas de qualquer origem (necessário para apps mobile/web)
-    cors: true,
-    // Cloud Functions v2 roda no Cloud Run que bloqueia requests não-autenticados por padrão.
-    // invoker: "public" libera o acesso HTTP, mas a segurança é garantida dentro da função
-    // pela verificação de role admin (request.auth).
-    invoker: 'public',
-  },
-  async (request) => {
+exports.deleteUserAccount = functions
+  .region('us-central1')
+  .https.onCall(async (data, context) => {
     // ── 1. Verificar autenticação ──
-    const authContext = request.auth;
-    if (!authContext || !authContext.uid) {
-      throw new HttpsError(
+    if (!context.auth || !context.auth.uid) {
+      throw new functions.https.HttpsError(
         'unauthenticated',
         'Você precisa estar autenticado para realizar esta ação.'
       );
     }
 
-    const callerUid = authContext.uid;
+    const callerUid = context.auth.uid;
     console.log(`[deleteUserAccount] Chamado por: ${callerUid}`);
 
     // ── 2. Extrair e validar UID do alvo ──
-    const targetUid = request.data?.uid;
+    const targetUid = data?.uid;
     if (!targetUid || typeof targetUid !== 'string') {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         'invalid-argument',
         'UID do usuário alvo é obrigatório e deve ser uma string.'
       );
@@ -51,14 +46,14 @@ exports.deleteUserAccount = onCall(
 
     // Validação de formato do UID
     if (targetUid.length > 128 || !/^[a-zA-Z0-9]+$/.test(targetUid)) {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         'invalid-argument',
         'UID do usuário alvo possui formato inválido.'
       );
     }
 
     if (targetUid === callerUid) {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         'invalid-argument',
         'Você não pode excluir sua própria conta.'
       );
@@ -79,14 +74,14 @@ exports.deleteUserAccount = onCall(
       callerDoc = await db.collection('users').doc(callerUid).get();
     } catch (err) {
       console.error('[deleteUserAccount] Erro ao buscar documento do chamador:', err);
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         'internal',
         'Erro ao verificar permissões do administrador.'
       );
     }
 
     if (!callerDoc.exists) {
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         'permission-denied',
         'Seu documento de usuário não foi encontrado. Contate o suporte.'
       );
@@ -95,7 +90,7 @@ exports.deleteUserAccount = onCall(
     const callerRole = callerDoc.data()?.role;
     if (callerRole !== 'admin') {
       console.warn(`[deleteUserAccount] Usuário ${callerUid} tentou excluir sem ser admin (role: ${callerRole})`);
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         'permission-denied',
         'Apenas administradores podem excluir usuários.'
       );
@@ -109,12 +104,11 @@ exports.deleteUserAccount = onCall(
       console.log(`[deleteUserAccount] Auth deletado para: ${targetUid}`);
     } catch (err) {
       if (err.code === 'auth/user-not-found') {
-        // Usuário já não existia no Auth — ok, continua para limpar Firestore
         console.warn(`[deleteUserAccount] Usuário ${targetUid} não encontrado no Auth (já removido). Continuando...`);
-        authDeleted = true; // não é erro, e-mail já está livre
+        authDeleted = true;
       } else {
         console.error('[deleteUserAccount] Erro ao excluir do Auth:', err.code, err.message);
-        throw new HttpsError(
+        throw new functions.https.HttpsError(
           'internal',
           `Erro ao excluir conta de autenticação: ${err.message}`
         );
@@ -127,8 +121,7 @@ exports.deleteUserAccount = onCall(
       console.log(`[deleteUserAccount] Documento Firestore deletado para: ${targetUid}`);
     } catch (err) {
       console.error('[deleteUserAccount] Erro ao excluir documento do Firestore:', err);
-      // Auth já foi deletado, mas Firestore falhou — relatar parcialidade
-      throw new HttpsError(
+      throw new functions.https.HttpsError(
         'internal',
         'A conta de autenticação foi removida, mas houve erro ao excluir os dados do Firestore. Tente novamente.'
       );
@@ -141,5 +134,4 @@ exports.deleteUserAccount = onCall(
       authDeleted,
       message: 'Usuário excluído com sucesso. E-mail liberado para reutilização.',
     };
-  }
-);
+  });
