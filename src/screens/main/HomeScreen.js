@@ -11,20 +11,9 @@ import {
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
+import { getTodayKey, formatCurrentDateBR } from '../../utils/dateUtils';
 
 const CLASS_TIMES = ['06:00', '07:00', '09:00', '12:00', '16:20', '17:30', '18:40', '20:00'];
-
-function getTodayKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
-
-function formatDateBR() {
-  const days = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-  const months = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
-  const now = new Date();
-  return `${days[now.getDay()]}, ${now.getDate()} de ${months[now.getMonth()]}`;
-}
 
 export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -88,7 +77,7 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Olá, {userName}</Text>
-            <Text style={styles.subGreeting}>{formatDateBR()}</Text>
+            <Text style={styles.subGreeting}>{formatCurrentDateBR()}</Text>
           </View>
           <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
             <Text style={styles.logoutText}>Sair</Text>

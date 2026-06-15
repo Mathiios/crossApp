@@ -6,21 +6,10 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { doc, setDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
+import { getTodayKey, formatDateBR } from '../../utils/dateUtils';
+import { sanitizeText } from '../../utils/inputValidation';
 
-function getTodayKey() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function formatDateBR(key) {
-  const [y, m, d] = key.split('-');
-  const days = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-  const date = new Date(`${y}-${m}-${d}T12:00:00`);
-  return `${days[date.getDay()]}, ${d}/${m}/${y}`;
-}
+// Funções de data agora vêm de dateUtils.js
 
 const EMPTY_WOD = { warmup: '', metcon: '', rx: '', notas: '' };
 
@@ -31,7 +20,7 @@ export default function WODScreen() {
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState(EMPTY_WOD);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState({ text: '', type: '' });
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const todayKey = getTodayKey();
@@ -63,30 +52,30 @@ export default function WODScreen() {
     return () => { clearTimeout(timeout); unsub(); };
   }, [todayKey]);
 
-  const showMessage = (text) => {
-    setMessage(text);
-    setTimeout(() => setMessage(''), 3000);
+  const showMessage = (text, type = 'success') => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage({ text: '', type: '' }), 3000);
   };
 
   const handleSave = async () => {
     if (!form.warmup && !form.metcon && !form.rx) {
-      showMessage('Preencha pelo menos um campo do treino.');
+      showMessage('Preencha pelo menos um campo do treino.', 'error');
       return;
     }
     setSaving(true);
     try {
       const wodRef = doc(db, 'wods', todayKey);
       await setDoc(wodRef, {
-        warmup: form.warmup.trim(),
-        metcon: form.metcon.trim(),
-        rx: form.rx.trim(),
-        notas: form.notas.trim(),
+        warmup: sanitizeText(form.warmup),
+        metcon: sanitizeText(form.metcon),
+        rx: sanitizeText(form.rx),
+        notas: sanitizeText(form.notas),
         updatedAt: new Date().toISOString(),
       });
       setEditMode(false);
       showMessage('Treino salvo com sucesso!');
     } catch (err) {
-      showMessage('Erro ao salvar. Tente novamente.');
+      showMessage('Erro ao salvar. Tente novamente.', 'error');
     } finally {
       setSaving(false);
     }
@@ -104,7 +93,7 @@ export default function WODScreen() {
       await deleteDoc(doc(db, 'wods', todayKey));
       showMessage('Treino excluído com sucesso.');
     } catch (err) {
-      showMessage('Erro ao excluir. Tente novamente.');
+      showMessage('Erro ao excluir. Tente novamente.', 'error');
     } finally {
       setSaving(false);
     }
@@ -153,9 +142,9 @@ export default function WODScreen() {
         </View>
 
         {/* Mensagem feedback */}
-        {message ? (
-          <View style={styles.messageBanner}>
-            <Text style={styles.messageText}>{message}</Text>
+        {message.text ? (
+          <View style={[styles.messageBanner, message.type === 'error' && styles.messageBannerError]}>
+            <Text style={[styles.messageText, message.type === 'error' && styles.messageTextError]}>{message.text}</Text>
           </View>
         ) : null}
 
@@ -371,7 +360,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#C6F6D5',
   },
+  messageBannerError: {
+    backgroundColor: '#FFF0F0',
+    borderColor: '#FFCCCC',
+  },
   messageText: { color: '#16A34A', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  messageTextError: { color: '#CC0000' },
 
   // Edit mode
   editCard: {

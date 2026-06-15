@@ -6,20 +6,10 @@ import {
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
+import { getTodayKey, formatDateShortBR } from '../../utils/dateUtils';
 
 const CLASS_TIMES = ['06:00', '07:00', '09:00', '12:00', '16:20', '17:30', '18:40', '20:00'];
 const MAX_SPOTS = 20;
-
-function getTodayKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-}
-function formatDateBR(key) {
-  const [y,m,d] = key.split('-');
-  const days = ['Domingo','Segunda','Terca','Quarta','Quinta','Sexta','Sabado'];
-  const date = new Date(`${y}-${m}-${d}T12:00:00`);
-  return `${days[date.getDay()]}, ${d}/${m}/${y}`;
-}
 
 export default function CheckinScreen() {
   const { user, canManageCheckins } = useAuth();
@@ -181,7 +171,7 @@ export default function CheckinScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Agendar Aula</Text>
-          <Text style={styles.headerSubtitle}>{formatDateBR(todayKey)}</Text>
+          <Text style={styles.headerSubtitle}>{formatDateShortBR(todayKey)}</Text>
         </View>
 
         {/* Tabs (professor/admin) */}
