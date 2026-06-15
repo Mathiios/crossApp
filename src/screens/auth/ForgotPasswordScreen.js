@@ -11,6 +11,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { validateEmail } from '../../utils/inputValidation';
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -24,6 +25,14 @@ export default function ForgotPasswordScreen({ navigation }) {
       setError('Digite seu e-mail.');
       return;
     }
+
+    // Validação de e-mail
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      setError(emailCheck.error);
+      return;
+    }
+
     setError('');
     setLoading(true);
     try {

@@ -12,6 +12,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { validateEmail, validatePassword, validateName } from '../../utils/inputValidation';
 
 export default function RegisterScreen({ navigation }) {
   const [name, setName] = useState('');
@@ -28,12 +29,30 @@ export default function RegisterScreen({ navigation }) {
       setError('Preencha todos os campos.');
       return;
     }
+
+    // Validação de nome
+    const nameCheck = validateName(name);
+    if (!nameCheck.valid) {
+      setError(nameCheck.error);
+      return;
+    }
+
+    // Validação de e-mail
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      setError(emailCheck.error);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('As senhas não conferem.');
       return;
     }
-    if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres.');
+
+    // Validação de senha forte
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.error);
       return;
     }
     setLoading(true);

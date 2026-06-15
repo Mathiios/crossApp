@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { validateEmail } from '../../utils/inputValidation';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -19,6 +20,8 @@ export default function LoginScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(false);
+  const cooldownTimer = useRef(null);
   const { login } = useAuth();
 
   const handleLogin = async () => {
@@ -27,6 +30,19 @@ export default function LoginScreen({ navigation }) {
       setError('Preencha todos os campos.');
       return;
     }
+
+    // Validação de e-mail
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) {
+      setError(emailCheck.error);
+      return;
+    }
+
+    if (cooldown) {
+      setError('Aguarde alguns segundos antes de tentar novamente.');
+      return;
+    }
+
     setLoading(true);
     try {
       await login(email.trim(), password);
@@ -38,6 +54,10 @@ export default function LoginScreen({ navigation }) {
       else if (code === 'auth/invalid-credential') setError('E-mail ou senha incorretos.');
       else if (code === 'auth/too-many-requests') setError('Muitas tentativas. Tente mais tarde.');
       else setError(`Erro: ${code || err?.message || 'desconhecido'}`);
+
+      // Rate limiting: 3 segundos de cooldown após falha
+      setCooldown(true);
+      cooldownTimer.current = setTimeout(() => setCooldown(false), 3000);
     } finally {
       setLoading(false);
     }
