@@ -53,6 +53,6 @@ try {
   db = getFirestore(app);
 }
 
-export const functions = getFunctions(app);
+export const functions = getFunctions(app, 'us-central1');
 export { auth, db };
 export default app;
