@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
+import { validateEmail, validatePassword, validateName, sanitizeText } from '../utils/inputValidation';
 
 const AuthContext = createContext({});
 export const useAuth = () => useContext(AuthContext);
@@ -73,22 +74,41 @@ export const AuthProvider = ({ children }) => {
   }, [user?.uid]);
 
   const register = async (email, password, name) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: name.trim() });
+    // Validação de inputs
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) throw new Error(emailCheck.error);
+
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) throw new Error(passwordCheck.error);
+
+    const nameCheck = validateName(name);
+    if (!nameCheck.valid) throw new Error(nameCheck.error);
+
+    // Sanitização
+    const safeName = sanitizeText(name.trim());
+    const safeEmail = email.trim().toLowerCase();
+
+    const cred = await createUserWithEmailAndPassword(auth, safeEmail, password);
+    await updateProfile(cred.user, { displayName: safeName });
     await setDoc(doc(db, 'users', cred.user.uid), {
-      name:      name.trim(),
-      email:     email.trim().toLowerCase(),
+      name:      safeName,
+      email:     safeEmail,
       role:      'aluno',
       status:    'active',
       createdAt: new Date().toISOString(),
     });
-    setUser({ ...cred.user, displayName: name.trim() });
+    setUser({ ...cred.user, displayName: safeName });
     return cred;
   };
 
-  const login        = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  const login = (email, password) => {
+    const emailCheck = validateEmail(email);
+    if (!emailCheck.valid) return Promise.reject({ code: 'auth/invalid-email', message: emailCheck.error });
+    return signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+  };
+
   const logout       = ()                => signOut(auth);
-  const resetPassword = (email)          => sendPasswordResetEmail(auth, email);
+  const resetPassword = (email)          => sendPasswordResetEmail(auth, email.trim().toLowerCase());
 
   const isAluno     = userRole === 'aluno';
   const isProfessor = userRole === 'professor';
