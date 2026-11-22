@@ -11,9 +11,9 @@ import { sanitizeText } from '../../utils/inputValidation';
 
 // Funções de data agora vêm de dateUtils.js
 
-const EMPTY_WOD = { warmup: '', metcon: '', rx: '', notas: '' };
+const EMPTY_WOD = { warmup: '', metcon: '', rx: '', notas: '', scoringType: 'reps' };
 
-export default function WODScreen() {
+export default function WODScreen({ navigation }) {
   const { canManageWOD } = useAuth();
   const [wod, setWod] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -70,6 +70,7 @@ export default function WODScreen() {
         metcon: sanitizeText(form.metcon),
         rx: sanitizeText(form.rx),
         notas: sanitizeText(form.notas),
+        scoringType: form.scoringType || 'reps',
         updatedAt: new Date().toISOString(),
       });
       setEditMode(false);
@@ -156,6 +157,26 @@ export default function WODScreen() {
               Use uma linha por exercício. Ex:{'\n'}10 Burpees{'\n'}400m Corrida
             </Text>
 
+            <Text style={styles.fieldLabel}>Tipo de Pontuação (Ranking)</Text>
+            <View style={styles.scoringTypeRow}>
+              <TouchableOpacity
+                style={[styles.scoringTypeBtn, form.scoringType === 'reps' && styles.scoringTypeBtnActive]}
+                onPress={() => setForm(f => ({ ...f, scoringType: 'reps' }))}
+              >
+                <Text style={[styles.scoringTypeBtnText, form.scoringType === 'reps' && styles.scoringTypeBtnTextActive]}>
+                  🏋️ Max Reps
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.scoringTypeBtn, form.scoringType === 'time' && styles.scoringTypeBtnActive]}
+                onPress={() => setForm(f => ({ ...f, scoringType: 'time' }))}
+              >
+                <Text style={[styles.scoringTypeBtnText, form.scoringType === 'time' && styles.scoringTypeBtnTextActive]}>
+                  ⏱️ For Time
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             <Text style={styles.fieldLabel}>Warm-up</Text>
             <TextInput
               style={styles.textArea}
@@ -232,7 +253,7 @@ export default function WODScreen() {
               <>
                 {/* WOD Header Card */}
                 <View style={styles.wodHeaderCard}>
-                  <Text style={styles.wodHeaderLabel}>WOD - Quarta, 25/10/2023</Text>
+                  <Text style={styles.wodHeaderLabel}>{`WOD - ${formatDateBR(todayKey)}`}</Text>
                 </View>
 
                 {/* Warm-up */}
@@ -282,9 +303,18 @@ export default function WODScreen() {
                   </View>
                 )}
 
+                {/* Scoring Type Badge */}
+                {wod.scoringType && (
+                  <View style={styles.scoringBadge}>
+                    <Text style={styles.scoringBadgeText}>
+                      {wod.scoringType === 'time' ? '⏱️ For Time' : '🏋️ Max Reps'}
+                    </Text>
+                  </View>
+                )}
+
                 {/* Confirmar Participação */}
-                <TouchableOpacity style={styles.confirmBtn}>
-                  <Text style={styles.confirmBtnText}>Confirmar Participacao</Text>
+                <TouchableOpacity style={styles.confirmBtn} onPress={() => navigation.navigate('Checkin')}>
+                  <Text style={styles.confirmBtnText}>Confirmar Participação</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -466,6 +496,51 @@ const styles = StyleSheet.create({
   },
   notesTitle: { color: '#888', fontWeight: '700', fontSize: 13, marginBottom: 8 },
   notesText: { color: '#444', fontSize: 14, lineHeight: 22 },
+
+  // Scoring type picker
+  scoringTypeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  scoringTypeBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1.5,
+    borderColor: '#E5E5E5',
+  },
+  scoringTypeBtnActive: {
+    backgroundColor: '#FFF0F0',
+    borderColor: '#CC0000',
+  },
+  scoringTypeBtnText: {
+    color: '#888',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  scoringTypeBtnTextActive: {
+    color: '#CC0000',
+  },
+
+  // Scoring badge on view mode
+  scoringBadge: {
+    backgroundColor: '#FFF0F0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFCCCC',
+  },
+  scoringBadgeText: {
+    color: '#CC0000',
+    fontWeight: '700',
+    fontSize: 13,
+  },
   confirmBtn: {
     backgroundColor: '#CC0000',
     borderRadius: 14,

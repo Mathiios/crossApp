@@ -53,3 +53,38 @@ export function formatDateShortBR(key) {
 export function formatCurrentDateBR(date = new Date()) {
   return `${DAYS_SHORT_PT[date.getDay()]}, ${date.getDate()} de ${MONTHS_PT[date.getMonth()]}`;
 }
+
+/**
+ * Retorna os dias úteis (Seg–Sáb) da semana corrente.
+ * Cada item: { key: 'YYYY-MM-DD', label: 'Seg', dayNum: 7, monthLabel: 'out', isToday: bool, isPast: bool }
+ * @returns {Array}
+ */
+export function getWeekDays() {
+  const today = new Date();
+  const todayStr = getTodayKey(today);
+  const dayOfWeek = today.getDay(); // 0 = Domingo
+
+  // Calcula segunda-feira desta semana
+  const monday = new Date(today);
+  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // se Domingo, volta 6 dias
+  monday.setDate(today.getDate() + diff);
+
+  const LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const days = [];
+
+  for (let i = 0; i < 6; i++) { // Seg a Sáb
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const key = getTodayKey(d);
+    days.push({
+      key,
+      label: LABELS[i],
+      dayNum: d.getDate(),
+      monthLabel: MONTHS_PT[d.getMonth()],
+      isToday: key === todayStr,
+      isPast: key < todayStr,
+    });
+  }
+
+  return days;
+}

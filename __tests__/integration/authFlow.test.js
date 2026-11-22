@@ -33,27 +33,20 @@ function TestApp() {
 
 afterEach(() => cleanup());
 
-beforeEach(() => {
-  jest.clearAllMocks();
-  jest.useFakeTimers();
-});
-
-afterEach(() => {
-  jest.useRealTimers();
-});
-
 /**
  * Helper: renderiza TestApp dentro de AuthProvider e
  * dispara o callback de onAuthStateChanged com null (sem usuário).
- * Avança timers para que o onSnapshot setTimeout também execute.
  */
 async function renderWithAuth() {
-  render(<AuthProvider><TestApp /></AuthProvider>);
+  await act(async () => {
+    render(<AuthProvider><TestApp /></AuthProvider>);
+  });
 
   // Simula: Firebase Auth terminou de verificar → sem usuário logado
   await act(async () => {
     mockAuthStateCallback(null);
-    jest.runAllTimers();
+    // Flush de microtasks para propagar os setState
+    await new Promise(resolve => setTimeout(resolve, 0));
   });
 }
 

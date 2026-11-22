@@ -39,6 +39,30 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // ── Rankings ──
+    // Leitura para qualquer autenticado.
+    // Escrita no documento pai: qualquer autenticado (auto-criação).
+    match /rankings/{rankingId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+
+      // Scores: atleta escreve/apaga somente o próprio doc (scoreId == uid).
+      // Professor/admin pode escrever/apagar qualquer score.
+      match /scores/{scoreId} {
+        allow read: if request.auth != null;
+
+        // Atleta cria/atualiza apenas seu próprio score
+        allow create, update: if request.auth != null
+                     && (request.auth.uid == scoreId
+                         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['professor', 'admin']);
+
+        // Atleta exclui apenas seu próprio score; prof/admin exclui qualquer um
+        allow delete: if request.auth != null
+                     && (request.auth.uid == scoreId
+                         || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['professor', 'admin']);
+      }
+    }
+
     // ── Bloquear todo o resto ──
     match /{document=**} {
       allow read, write: if false;

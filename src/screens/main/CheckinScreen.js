@@ -1,19 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Modal, SafeAreaView,
+  ActivityIndicator, Modal, SafeAreaView, Animated,
 } from 'react-native';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
-import { getTodayKey, formatDateShortBR } from '../../utils/dateUtils';
+import { getTodayKey, formatDateShortBR, getWeekDays } from '../../utils/dateUtils';
 
-const CLASS_TIMES = ['06:00', '07:00', '09:00', '12:00', '16:20', '17:30', '18:40', '20:00'];
+const CLASS_TIMES = ['06:00', '07:00', '09:00', '16:20', '17:30', '18:40', '20:00'];
 const MAX_SPOTS = 20;
 
 export default function CheckinScreen() {
   const { user, canManageCheckins } = useAuth();
-  const [mode, setMode] = useState('personal');
+
+  // Dias da semana (Seg–Sáb)
+  const weekDays = useMemo(() => getWeekDays(), []);
+  const todayKey = getTodayKey();
+
+  // Dia selecionado pelo aluno (default = hoje)
+  const [selectedDay, setSelectedDay] = useState(todayKey);
+
+  // Filtra horários disponíveis: para hoje, alunos só veem horários futuros
+  const getAvailableTimes = (dayKey) => {
+    if (canManageCheckins) return CLASS_TIMES; // professor/admin vê todos
+    if (dayKey !== todayKey) return CLASS_TIMES; // dias futuros: mostra todos
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    return CLASS_TIMES.filter((time) => {
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m > currentMinutes;
+    });
+  };
+
+  const availableTimes = getAvailableTimes(selectedDay);
+
+  const [mode, setMode] = useState(canManageCheckins ? 'manage' : 'personal');
   const [slots, setSlots] = useState({});
   const [userCheckin, setUserCheckin] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -25,11 +47,10 @@ export default function CheckinScreen() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [pendingClearSlot, setPendingClearSlot] = useState(null);
 
-  const todayKey = getTodayKey();
-
+  // Listener do dia selecionado
   useEffect(() => {
     setLoading(true); setError('');
-    const ref = doc(db, 'checkins', todayKey);
+    const ref = doc(db, 'checkins', selectedDay);
     const timeout = setTimeout(() => { setLoading(false); setError('permission-denied'); }, 10000);
     const unsub = onSnapshot(ref,
       (snap) => {
@@ -46,7 +67,7 @@ export default function CheckinScreen() {
       (err) => { clearTimeout(timeout); setLoading(false); setError(err.code || 'unknown'); }
     );
     return () => { clearTimeout(timeout); unsub(); };
-  }, [todayKey, user.uid]);
+  }, [selectedDay, user.uid]);
 
   useEffect(() => {
     if (mode !== 'manage') return;
@@ -64,6 +85,14 @@ export default function CheckinScreen() {
 
   const handleSelfCheckin = async (time) => {
     if (actionLoading) return;
+
+    // Bloqueia check-in em dias passados
+    const dayInfo = weekDays.find(d => d.key === selectedDay);
+    if (dayInfo && dayInfo.isPast) {
+      showMsg('Não é possível fazer check-in em dias passados.', 'error');
+      return;
+    }
+
     if (userCheckin && userCheckin !== time) {
       showMsg(`Voce ja esta inscrito nas ${userCheckin}. Cancele primeiro.`, 'error');
       return;
@@ -73,7 +102,7 @@ export default function CheckinScreen() {
       setActionLoading(true);
       try {
         const entry = spots.find(u => u.uid === user.uid);
-        await updateDoc(doc(db, 'checkins', todayKey), { [`slots.${time}`]: arrayRemove(entry) });
+        await updateDoc(doc(db, 'checkins', selectedDay), { [`slots.${time}`]: arrayRemove(entry) });
         showMsg('Check-in cancelado.', 'info');
       } catch(e) { showMsg(`Erro: ${e.code}`, 'error'); }
       finally { setActionLoading(false); }
@@ -82,7 +111,7 @@ export default function CheckinScreen() {
     if (spots.length >= MAX_SPOTS) { showMsg('Essa aula esta lotada!', 'error'); return; }
     setActionLoading(true);
     try {
-      const ref = doc(db, 'checkins', todayKey);
+      const ref = doc(db, 'checkins', selectedDay);
       const snap = await getDoc(ref);
       const entry = { uid: user.uid, name: user.displayName || user.email, email: user.email };
       if (!snap.exists()) await setDoc(ref, { slots: { [time]: [entry] } });
@@ -96,7 +125,7 @@ export default function CheckinScreen() {
     if (actionLoading) return;
     setActionLoading(true);
     try {
-      const ref = doc(db, 'checkins', todayKey);
+      const ref = doc(db, 'checkins', selectedDay);
       const snap = await getDoc(ref);
       const entry = { uid: targetUser.uid, name: targetUser.name || targetUser.email, email: targetUser.email };
       if (add) {
@@ -133,11 +162,17 @@ export default function CheckinScreen() {
     setPendingClearSlot(null);
     setActionLoading(true);
     try {
-      await updateDoc(doc(db, 'checkins', todayKey), { [`slots.${time}`]: [] });
+      await updateDoc(doc(db, 'checkins', selectedDay), { [`slots.${time}`]: [] });
       showMsg(`Slot das ${time} foi limpo.`);
     } catch(e) { showMsg(`Erro: ${e.code}`, 'error'); }
     finally { setActionLoading(false); }
   };
+
+  // Verifica se o dia selecionado é passado
+  const isSelectedDayPast = (() => {
+    const d = weekDays.find(d => d.key === selectedDay);
+    return d ? d.isPast : false;
+  })();
 
   if (loading) {
     return (
@@ -171,30 +206,51 @@ export default function CheckinScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Agendar Aula</Text>
-          <Text style={styles.headerSubtitle}>{formatDateShortBR(todayKey)}</Text>
+          <Text style={styles.headerSubtitle}>{formatDateShortBR(selectedDay)}</Text>
         </View>
 
-        {/* Tabs (professor/admin) */}
-        {canManageCheckins && (
-          <View style={styles.modeTabs}>
-            <TouchableOpacity
-              style={[styles.modeTab, mode==='personal' && styles.modeTabActive]}
-              onPress={() => setMode('personal')}
-            >
-              <Text style={[styles.modeTabText, mode==='personal' && styles.modeTabTextActive]}>
-                Meu Check-in
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeTab, mode==='manage' && styles.modeTabActive]}
-              onPress={() => setMode('manage')}
-            >
-              <Text style={[styles.modeTabText, mode==='manage' && styles.modeTabTextActive]}>
-                Gerenciar Alunos
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* ── Seletor de Dias da Semana ── */}
+        <View style={styles.dayPickerContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayPickerScroll}>
+            {weekDays.map((day) => {
+              const isActive = day.key === selectedDay;
+              const isPast = day.isPast;
+              return (
+                <TouchableOpacity
+                  key={day.key}
+                  style={[
+                    styles.dayPill,
+                    isActive && styles.dayPillActive,
+                    isPast && !isActive && styles.dayPillPast,
+                    day.isToday && !isActive && styles.dayPillToday,
+                  ]}
+                  onPress={() => setSelectedDay(day.key)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.dayPillLabel,
+                    isActive && styles.dayPillLabelActive,
+                    isPast && !isActive && styles.dayPillLabelPast,
+                  ]}>
+                    {day.label}
+                  </Text>
+                  <Text style={[
+                    styles.dayPillNum,
+                    isActive && styles.dayPillNumActive,
+                    isPast && !isActive && styles.dayPillNumPast,
+                  ]}>
+                    {day.dayNum}
+                  </Text>
+                  {day.isToday && (
+                    <View style={[styles.todayDot, isActive && styles.todayDotActive]} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+
 
         {/* Mensagem */}
         {message.text ? (
@@ -208,6 +264,13 @@ export default function CheckinScreen() {
             </Text>
           </View>
         ) : null}
+
+        {/* Aviso dia passado */}
+        {isSelectedDayPast && mode === 'personal' && (
+          <View style={styles.pastDayBanner}>
+            <Text style={styles.pastDayText}>📋 Visualização do dia passado (somente leitura)</Text>
+          </View>
+        )}
 
         {/* MODO PESSOAL */}
         {mode === 'personal' && (
@@ -223,17 +286,24 @@ export default function CheckinScreen() {
                 </View>
               </View>
             ) : (
-              <View style={styles.noCheckinBanner}>
-                <Text style={styles.noCheckinText}>Selecione uma aula para fazer o check-in</Text>
-              </View>
+              !isSelectedDayPast && (
+                <View style={styles.noCheckinBanner}>
+                  <Text style={styles.noCheckinText}>Selecione uma aula para fazer o check-in</Text>
+                </View>
+              )
             )}
 
             <View style={styles.slotsContainer}>
-              {CLASS_TIMES.map((time) => {
+              {availableTimes.length === 0 ? (
+                <View style={styles.noCheckinBanner}>
+                  <Text style={styles.noCheckinText}>Nenhum horário disponível para este dia.</Text>
+                </View>
+              ) : availableTimes.map((time) => {
                 const usersInSlot = slots[time] || [];
                 const count = usersInSlot.length;
                 const isFull = count >= MAX_SPOTS;
                 const isMySlot = userCheckin === time;
+                const disabled = actionLoading || (isSelectedDayPast && !canManageCheckins);
                 return (
                   <TouchableOpacity
                     key={time}
@@ -241,9 +311,10 @@ export default function CheckinScreen() {
                       styles.slotCard,
                       isMySlot && styles.slotMine,
                       isFull && !isMySlot && styles.slotFull,
+                      isSelectedDayPast && styles.slotPastDay,
                     ]}
                     onPress={() => handleSelfCheckin(time)}
-                    disabled={actionLoading}
+                    disabled={disabled}
                   >
                     <View>
                       <Text style={[styles.slotTime, isFull && !isMySlot && { color: '#BBBBBB' }]}>
@@ -263,11 +334,13 @@ export default function CheckinScreen() {
                         </View>
                         <Text style={styles.progressText}>{count}/{MAX_SPOTS}</Text>
                       </View>
-                      {isMySlot
-                        ? <View style={styles.badgeGreen}><Text style={styles.badgeGreenTxt}>Cancelar</Text></View>
-                        : isFull
-                          ? <View style={styles.badgeRed}><Text style={styles.badgeRedTxt}>Lotado</Text></View>
-                          : <View style={styles.badgeGray}><Text style={styles.badgeGrayTxt}>{MAX_SPOTS-count} vagas</Text></View>
+                      {isSelectedDayPast
+                        ? <View style={styles.badgePast}><Text style={styles.badgePastTxt}>{count} alunos</Text></View>
+                        : isMySlot
+                          ? <View style={styles.badgeGreen}><Text style={styles.badgeGreenTxt}>Cancelar</Text></View>
+                          : isFull
+                            ? <View style={styles.badgeRed}><Text style={styles.badgeRedTxt}>Lotado</Text></View>
+                            : <View style={styles.badgeGray}><Text style={styles.badgeGrayTxt}>{MAX_SPOTS-count} vagas</Text></View>
                       }
                     </View>
                   </TouchableOpacity>
@@ -405,9 +478,72 @@ const styles = StyleSheet.create({
   errorTitle: { color:'#CC0000', fontSize:20, fontWeight:'800', marginBottom:4 },
   errorSub: { color:'#888', fontSize:13 },
 
-  header: { paddingTop: 20, paddingBottom: 16 },
+  header: { paddingTop: 20, paddingBottom: 12 },
   headerTitle: { color:'#1A1A1A', fontSize: 26, fontWeight:'900' },
   headerSubtitle: { color:'#888', fontSize: 13, marginTop: 4 },
+
+  // ── Day Picker ──
+  dayPickerContainer: { marginBottom: 16 },
+  dayPickerScroll: { gap: 8, paddingVertical: 4 },
+  dayPill: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 52,
+    borderWidth: 1.5,
+    borderColor: '#EBEBEB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  dayPillActive: {
+    backgroundColor: '#CC0000',
+    borderColor: '#CC0000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  dayPillPast: {
+    backgroundColor: '#F8F8F8',
+    borderColor: '#E5E5E5',
+    opacity: 0.55,
+  },
+  dayPillToday: {
+    borderColor: '#CC0000',
+    borderWidth: 2,
+  },
+  dayPillLabel: { color: '#888', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
+  dayPillLabelActive: { color: 'rgba(255,255,255,0.8)' },
+  dayPillLabelPast: { color: '#BBB' },
+  dayPillNum: { color: '#1A1A1A', fontSize: 20, fontWeight: '900', marginTop: 2 },
+  dayPillNumActive: { color: '#fff' },
+  dayPillNumPast: { color: '#BBB' },
+  todayDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#CC0000',
+    marginTop: 4,
+  },
+  todayDotActive: {
+    backgroundColor: '#fff',
+  },
+
+  // ── Past day banner ──
+  pastDayBanner: {
+    backgroundColor: '#FFF9E6',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFE4A0',
+    alignItems: 'center',
+  },
+  pastDayText: { color: '#B8860B', fontSize: 13, fontWeight: '600' },
 
   modeTabs: {
     flexDirection:'row', backgroundColor:'#EBEBEB', borderRadius:12,
@@ -455,6 +591,7 @@ const styles = StyleSheet.create({
   },
   slotMine: { borderColor:'#22C55E', backgroundColor:'#F0FFF4' },
   slotFull: { opacity:0.5 },
+  slotPastDay: { opacity: 0.6 },
   slotTime: { color:'#1A1A1A', fontSize:22, fontWeight:'800' },
   slotLabel: { color:'#999', fontSize:11, marginTop:2 },
   slotRight: { alignItems:'flex-end', gap:8 },
@@ -477,6 +614,11 @@ const styles = StyleSheet.create({
     paddingVertical:4, borderWidth:1, borderColor:'#FFCCCC',
   },
   badgeGrayTxt: { color:'#CC0000', fontSize:12, fontWeight:'700' },
+  badgePast: {
+    backgroundColor:'#F5F5F5', borderRadius:20, paddingHorizontal:12,
+    paddingVertical:4, borderWidth:1, borderColor:'#E5E5E5',
+  },
+  badgePastTxt: { color:'#999', fontSize:12, fontWeight:'600' },
 
   manageLabel: { color:'#888', fontSize:13, fontWeight:'600', marginBottom:10 },
   slotChipsScroll: { marginBottom:20 },

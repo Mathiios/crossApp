@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,19 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
+import { collection, query, where, getDocs, collectionGroup } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout, userRole, isAdmin } = useAuth();
   const userName = user?.displayName || user?.email?.split('@')[0] || 'Atleta';
+
+  const [stats, setStats] = useState({ treinos: '...', meses: '...', prs: '...' });
+  const [loadingStats, setLoadingStats] = useState(true);
 
   const roleConfig = {
     aluno:     { label: 'Aluno',          color: '#3B82F6', icon: 'A' },
@@ -19,6 +26,73 @@ export default function ProfileScreen({ navigation }) {
     admin:     { label: 'Administrador',   color: '#CC0000', icon: 'X' },
   };
   const role = roleConfig[userRole] || roleConfig.aluno;
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    try {
+      setLoadingStats(true);
+
+      // Total de treinos (dias com check-in)
+      let totalCheckins = 0;
+      try {
+        const checkinsSnap = await getDocs(collection(db, 'checkins'));
+        checkinsSnap.forEach((docSnap) => {
+          const slots = docSnap.data().slots || {};
+          for (const time of Object.keys(slots)) {
+            if ((slots[time] || []).some(u => u.uid === user.uid)) {
+              totalCheckins++;
+              break;
+            }
+          }
+        });
+      } catch (e) { /* silencioso */ }
+
+      // Meses desde criação da conta
+      let meses = 0;
+      try {
+        const creationTime = user?.metadata?.creationTime;
+        if (creationTime) {
+          const created = new Date(creationTime);
+          const now = new Date();
+          meses = Math.max(1,
+            (now.getFullYear() - created.getFullYear()) * 12 +
+            (now.getMonth() - created.getMonth())
+          );
+        }
+      } catch (e) { meses = 1; }
+
+      // Total de PRs (scores no ranking)
+      let totalPRs = 0;
+      try {
+        const scoresQuery = query(
+          collectionGroup(db, 'scores'),
+          where('athleteUid', '==', user.uid)
+        );
+        const scoresSnap = await getDocs(scoresQuery);
+        totalPRs = scoresSnap.size;
+      } catch (e) { /* silencioso */ }
+
+      setStats({
+        treinos: String(totalCheckins),
+        meses: String(meses),
+        prs: String(totalPRs),
+      });
+    } catch (e) {
+      setStats({ treinos: '0', meses: '1', prs: '0' });
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  const menuItems = [
+    { icon: 'fitness', label: 'Meus Resultados', desc: 'Historico de treinos', screen: 'WOD' },
+    { icon: 'trending-up', label: 'Progresso', desc: 'Seus PRs e evolucao', screen: 'Ranking' },
+    { icon: 'notifications', label: 'Notificacoes', desc: 'Alertas e lembretes', screen: null },
+    { icon: 'settings', label: 'Configuracoes', desc: 'Preferencias do app', screen: null },
+  ];
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -42,35 +116,40 @@ export default function ProfileScreen({ navigation }) {
 
         {/* Stats */}
         <View style={styles.statsRow}>
-          {[
-            { label: 'Treinos', value: '24' },
-            { label: 'Meses', value: '6' },
-            { label: 'PRs', value: '12' },
-          ].map((stat) => (
-            <View key={stat.label} style={styles.statItem}>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
+          {loadingStats ? (
+            <View style={{ flex: 1, alignItems: 'center', paddingVertical: 8 }}>
+              <ActivityIndicator size="small" color="#CC0000" />
             </View>
-          ))}
+          ) : (
+            [
+              { label: 'Treinos', value: stats.treinos },
+              { label: 'Meses', value: stats.meses },
+              { label: 'PRs', value: stats.prs },
+            ].map((stat) => (
+              <View key={stat.label} style={styles.statItem}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Menu Items */}
         <View style={styles.menuSection}>
-          {[
-            { icon: 'T', label: 'Meus Resultados', desc: 'Historico de treinos' },
-            { icon: 'G', label: 'Progresso', desc: 'Seus PRs e evolucao' },
-            { icon: 'N', label: 'Notificacoes', desc: 'Alertas e lembretes' },
-            { icon: 'C', label: 'Configuracoes', desc: 'Preferencias do app' },
-          ].map((item) => (
-            <TouchableOpacity key={item.label} style={styles.menuItem}>
+          {menuItems.map((item) => (
+            <TouchableOpacity
+              key={item.label}
+              style={styles.menuItem}
+              onPress={() => item.screen && navigation.navigate(item.screen)}
+            >
               <View style={styles.menuIcon}>
-                <Text style={styles.menuIconText}>{item.icon}</Text>
+                <Ionicons name={item.icon} size={20} color="#CC0000" />
               </View>
               <View style={styles.menuContent}>
                 <Text style={styles.menuLabel}>{item.label}</Text>
                 <Text style={styles.menuDesc}>{item.desc}</Text>
               </View>
-              <Text style={styles.menuArrow}>›</Text>
+              <Ionicons name="chevron-forward" size={20} color="#CCC" />
             </TouchableOpacity>
           ))}
         </View>
@@ -170,11 +249,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 14,
   },
-  menuIconText: { fontSize: 16, fontWeight: '800', color: '#CC0000' },
   menuContent: { flex: 1 },
   menuLabel: { color: '#1A1A1A', fontSize: 15, fontWeight: '700' },
   menuDesc: { color: '#999', fontSize: 12, marginTop: 2 },
-  menuArrow: { color: '#CCC', fontSize: 24, fontWeight: '300' },
   adminBtn: {
     backgroundColor: '#FFF0F0',
     borderRadius: 14,

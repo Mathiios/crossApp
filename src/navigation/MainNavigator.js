@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -14,12 +15,14 @@ import { useAuth } from '../context/AuthContext';
 const Tab = createBottomTabNavigator();
 const ProfileStack = createNativeStackNavigator();
 
-const TabIcon = ({ label, focused, icon }) => (
+const TabIcon = ({ label, focused, icon, iconOutline }) => (
   <View style={[iconStyles.container, focused && iconStyles.containerFocused]}>
     <View style={[iconStyles.iconBox, focused && iconStyles.iconBoxFocused]}>
-      <Text style={[iconStyles.iconText, focused && iconStyles.iconTextFocused]}>
-        {icon}
-      </Text>
+      <Ionicons
+        name={focused ? icon : (iconOutline || `${icon}-outline`)}
+        size={22}
+        color={focused ? '#CC0000' : '#AAAAAA'}
+      />
     </View>
     <Text style={[iconStyles.label, focused && iconStyles.labelFocused]}>{label}</Text>
   </View>
@@ -100,27 +103,27 @@ export default function MainNavigator() {
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="I" label="Inicio" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="home" label="Inicio" focused={focused} /> }}
       />
       <Tab.Screen
         name="WOD"
         component={WODScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="W" label="Treino" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="barbell" label="Treino" focused={focused} /> }}
       />
       <Tab.Screen
         name="Checkin"
         component={CheckinScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="A" label="Aulas" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="calendar" label="Aulas" focused={focused} /> }}
       />
       <Tab.Screen
         name="Ranking"
         component={RankingScreen}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="R" label="Ranking" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="trophy" label="Ranking" focused={focused} /> }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileStackNavigator}
-        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="P" label="Perfil" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon icon="person" label="Perfil" focused={focused} /> }}
       />
     </Tab.Navigator>
   );

@@ -9,7 +9,9 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS === 'android') {
       NavigationBar.setVisibilityAsync('hidden');
-      NavigationBar.setBehaviorAsync('overlay-swipe');
+      NavigationBar.setBehaviorAsync('inset-swipe');
+      NavigationBar.setBackgroundColorAsync('transparent');
+      NavigationBar.setPositionAsync('absolute');
     }
   }, []);
 

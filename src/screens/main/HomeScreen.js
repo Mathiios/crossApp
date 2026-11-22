@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -13,7 +14,7 @@ import { db } from '../../config/firebase';
 import { useAuth } from '../../context/AuthContext';
 import { getTodayKey, formatCurrentDateBR } from '../../utils/dateUtils';
 
-const CLASS_TIMES = ['06:00', '07:00', '09:00', '12:00', '16:20', '17:30', '18:40', '20:00'];
+const CLASS_TIMES = ['06:00', '07:00', '09:00', '16:20', '17:30', '18:40', '20:00'];
 
 export default function HomeScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -63,10 +64,10 @@ export default function HomeScreen({ navigation }) {
   }, [todayKey]);
 
   const quickActions = [
-    { label: 'Marcar Aula',  screen: 'Checkin',  icon: 'A' },
-    { label: 'Ver WOD',      screen: 'WOD',       icon: 'W' },
-    { label: 'Ver Ranking',  screen: 'Ranking',   icon: 'R' },
-    { label: 'Meu Perfil',   screen: 'Profile',   icon: 'P' },
+    { label: 'Marcar Aula',  screen: 'Checkin',  icon: 'calendar' },
+    { label: 'Ver WOD',      screen: 'WOD',       icon: 'barbell' },
+    { label: 'Ver Ranking',  screen: 'Ranking',   icon: 'trophy' },
+    { label: 'Meu Perfil',   screen: 'Profile',   icon: 'person' },
   ];
 
   return (
@@ -102,7 +103,7 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.wodCard}>
               <View style={styles.wodTagRow}>
                 <View style={styles.wodTag}>
-                  <Text style={styles.wodTagText}>KAREN</Text>
+                  <Text style={styles.wodTagText}>WOD DO DIA</Text>
                 </View>
               </View>
               {wod.metcon ? (
@@ -152,7 +153,7 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.classCard}>
               <View style={styles.classInfoRow}>
                 <View style={styles.classIconBox}>
-                  <Text style={styles.classIconText}>A</Text>
+                  <Ionicons name="calendar" size={22} color="#CC0000" />
                 </View>
                 <View style={styles.classInfo}>
                   <Text style={styles.className}>Treino · {userCheckin}</Text>
@@ -199,7 +200,7 @@ export default function HomeScreen({ navigation }) {
                 onPress={() => navigation.navigate(item.screen)}
               >
                 <View style={styles.quickIconBox}>
-                  <Text style={styles.quickIconText}>{item.icon}</Text>
+                  <Ionicons name={item.icon} size={22} color="#CC0000" />
                 </View>
                 <Text style={styles.quickLabel}>{item.label}</Text>
               </TouchableOpacity>

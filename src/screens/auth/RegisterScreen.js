@@ -137,6 +137,7 @@ export default function RegisterScreen({ navigation }) {
                 secureTextEntry
                 value={password}
                 onChangeText={setPassword}
+                testID="input-password"
               />
             </View>
 
@@ -150,6 +151,7 @@ export default function RegisterScreen({ navigation }) {
                 secureTextEntry
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
+                testID="input-confirm-password"
               />
             </View>
 
@@ -170,6 +172,7 @@ export default function RegisterScreen({ navigation }) {
             <TouchableOpacity
               style={styles.loginLink}
               onPress={() => navigation.navigate('Login')}
+              testID="go-login-btn"
             >
               <Text style={styles.loginLinkText}>
                 Já tem conta?{' '}

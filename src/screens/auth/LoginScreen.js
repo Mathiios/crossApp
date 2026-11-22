@@ -93,6 +93,7 @@ export default function LoginScreen({ navigation }) {
               <TouchableOpacity
                 style={styles.tab}
                 onPress={() => navigation.navigate('Register')}
+                testID="go-register-btn"
               >
                 <Text style={styles.tabText}>Cadastrar</Text>
               </TouchableOpacity>
@@ -130,6 +131,7 @@ export default function LoginScreen({ navigation }) {
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
+                  testID="input-password"
                 />
                 <TouchableOpacity
                   style={styles.eyeBtn}
@@ -144,6 +146,7 @@ export default function LoginScreen({ navigation }) {
             <TouchableOpacity
               onPress={() => navigation.navigate('ForgotPassword')}
               style={styles.forgotBtn}
+              testID="forgot-btn"
             >
               <Text style={styles.forgotText}>Esqueceu a senha?</Text>
             </TouchableOpacity>
