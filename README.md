@@ -103,11 +103,11 @@ crossApp/
 
 ## 🛠️ Stack Tecnológica
 
-- **React Native** com **Expo** (SDK 51) — multiplataforma
-- **Firebase Auth** — autenticação email/senha
-- **React Navigation v6** — navegação (Stack + Bottom Tabs)
-- **Expo Linear Gradient** — gradientes premium
-- **AsyncStorage** — persistência da sessão
+- **React Native** com **Expo** (SDK 54) — multiplataforma
+- **Firebase Auth** — autenticação email/senha SDK 11.10.0 
+- **React Navigation v6.1.18** — navegação (Stack + Bottom Tabs)
+- **Expo Linear Gradient** — gradientes premium v15.0.8 
+- **AsyncStorage** — persistência da sessão v2.2.0 
 
 ---
 
