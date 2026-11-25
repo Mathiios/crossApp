@@ -1,5 +1,4 @@
 # crossApp 🏋️
-Licença: MIT. Veja o arquivo LICENSE.
 
 **Seu Box de CrossFit no Bolso** — App multiplataforma (iOS, Android e Web) construído com React Native + Expo + Firebase.
 
