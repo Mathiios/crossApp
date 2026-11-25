@@ -4,60 +4,15 @@
  * Testa as regras de negócio do ranking:
  *  - scoringType === 'reps' → ordenação DESCENDENTE (mais repetições primeiro)
  *  - scoringType === 'time' → ordenação ASCENDENTE  (menor tempo primeiro)
- *
- * As funções helper são replicadas do RankingScreen.js (linhas 15-56).
  */
 
-// ── Helpers (replicados do RankingScreen.js) ──────────────────────────────────
-
-function parseTimeInput(value) {
-  const trimmed = (value || '').trim();
-  if (!trimmed) return null;
-  if (trimmed.includes(':')) {
-    const parts = trimmed.split(':');
-    if (parts.length !== 2) return null;
-    const mins = parseInt(parts[0], 10);
-    const secs = parseInt(parts[1], 10);
-    if (isNaN(mins) || isNaN(secs) || mins < 0 || secs < 0 || secs >= 60) return null;
-    return mins * 60 + secs;
-  }
-  const n = parseInt(trimmed, 10);
-  return isNaN(n) || n < 0 ? null : n;
-}
-
-function formatTime(totalSeconds) {
-  if (totalSeconds == null) return '--';
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  return `${mins}:${String(secs).padStart(2, '0')}`;
-}
-
-function formatScore(score, scoringType) {
-  if (score == null) return '--';
-  if (scoringType === 'time') return formatTime(score);
-  return `${score} reps`;
-}
-
-function getDiff(score, leaderScore, scoringType) {
-  if (score == null || leaderScore == null || score === leaderScore) return '';
-  if (scoringType === 'time') {
-    const diff = score - leaderScore;
-    return `+${formatTime(diff)}`;
-  }
-  const diff = leaderScore - score;
-  return `-${diff} reps`;
-}
-
-/** Lógica de ordenação idêntica ao useMemo do RankingScreen (linhas 112-120) */
-function sortScores(rawScores, scoringType) {
-  const sorted = [...rawScores];
-  if (scoringType === 'time') {
-    sorted.sort((a, b) => (a.score || Infinity) - (b.score || Infinity));
-  } else {
-    sorted.sort((a, b) => (b.score || 0) - (a.score || 0));
-  }
-  return sorted;
-}
+import {
+  sortScores,
+  parseTimeInput,
+  formatTime,
+  formatScore,
+  getDiff,
+} from '../../../utils/rankingUtils';
 
 // ── Dados de fixture ─────────────────────────────────────────────────────────
 

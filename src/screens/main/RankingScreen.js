@@ -8,52 +8,7 @@ import { useAuth } from '../../context/AuthContext';
 import { doc, onSnapshot, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../../config/firebase';
 import { getTodayKey, formatDateBR } from '../../utils/dateUtils';
-
-// ── Helpers ──
-
-/** Converte input de tempo (mm:ss ou segundos puros) para total em segundos */
-function parseTimeInput(value) {
-  const trimmed = (value || '').trim();
-  if (!trimmed) return null;
-  // Formato mm:ss
-  if (trimmed.includes(':')) {
-    const parts = trimmed.split(':');
-    if (parts.length !== 2) return null;
-    const mins = parseInt(parts[0], 10);
-    const secs = parseInt(parts[1], 10);
-    if (isNaN(mins) || isNaN(secs) || mins < 0 || secs < 0 || secs >= 60) return null;
-    return mins * 60 + secs;
-  }
-  // Segundos puros
-  const n = parseInt(trimmed, 10);
-  return isNaN(n) || n < 0 ? null : n;
-}
-
-/** Formata segundos em mm:ss */
-function formatTime(totalSeconds) {
-  if (totalSeconds == null) return '--';
-  const mins = Math.floor(totalSeconds / 60);
-  const secs = totalSeconds % 60;
-  return `${mins}:${String(secs).padStart(2, '0')}`;
-}
-
-/** Formata score conforme tipo */
-function formatScore(score, scoringType) {
-  if (score == null) return '--';
-  if (scoringType === 'time') return formatTime(score);
-  return `${score} reps`;
-}
-
-/** Calcula diferença em relação ao líder */
-function getDiff(score, leaderScore, scoringType) {
-  if (score == null || leaderScore == null || score === leaderScore) return '';
-  if (scoringType === 'time') {
-    const diff = score - leaderScore;
-    return `+${formatTime(diff)}`;
-  }
-  const diff = leaderScore - score;
-  return `-${diff} reps`;
-}
+import { parseTimeInput, formatTime, formatScore, getDiff, sortScores } from '../../utils/rankingUtils';
 
 export default function RankingScreen() {
   const { user, userRole, canManageCheckins } = useAuth();
@@ -109,15 +64,7 @@ export default function RankingScreen() {
   }, [todayKey]);
 
   // Sorted scores (client-side)
-  const scores = useMemo(() => {
-    const sorted = [...rawScores];
-    if (scoringType === 'time') {
-      sorted.sort((a, b) => (a.score || Infinity) - (b.score || Infinity)); // ascendente
-    } else {
-      sorted.sort((a, b) => (b.score || 0) - (a.score || 0)); // descendente
-    }
-    return sorted;
-  }, [rawScores, scoringType]);
+  const scores = useMemo(() => sortScores(rawScores, scoringType), [rawScores, scoringType]);
 
   // My score
   const myScore = scores.find(s => s.id === user.uid);
