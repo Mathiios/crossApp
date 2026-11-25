@@ -1,26 +1,22 @@
 /**
  * Testes unitários — LoginScreen.js
  *
- * RNTL v14 + React 19: render() é assíncrono, deve ser aguardado com await.
+ * RNTL v14 + React 19: render() é async, e userEvent é necessário para
+ * inputs com secureTextEntry atualizarem o estado corretamente.
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor, cleanup } from '@testing-library/react-native';
+import { render, userEvent, waitFor, cleanup } from '@testing-library/react-native';
 
 const mockLogin = jest.fn();
 jest.mock('../../../context/AuthContext', () => ({
-  useAuth: () => ({
-    login: mockLogin,
-  }),
+  useAuth: () => ({ login: mockLogin }),
 }));
 
 import LoginScreen from '../LoginScreen';
 
 const mockNavigate = jest.fn();
-const mockNavigation = {
-  navigate: mockNavigate,
-  goBack: jest.fn(),
-};
+const mockNavigation = { navigate: mockNavigate, goBack: jest.fn() };
 
 beforeEach(() => {
   mockLogin.mockReset();
@@ -35,6 +31,8 @@ afterEach(() => {
 async function renderScreen() {
   return await render(<LoginScreen navigation={mockNavigation} />);
 }
+
+// ─── Renderização ───────────────────────────────────────────────────────────
 
 describe('LoginScreen — Renderização', () => {
   test('renderiza campos de e-mail e senha', async () => {
@@ -59,51 +57,63 @@ describe('LoginScreen — Renderização', () => {
   });
 });
 
+// ─── Validação ───────────────────────────────────────────────────────────────
+
 describe('LoginScreen — Validação', () => {
   test('exibe erro se campos vazios', async () => {
     const { getByText } = await renderScreen();
-    fireEvent.press(getByText('ENTRAR'));
+    const user = userEvent.setup();
+    await user.press(getByText('ENTRAR'));
     await waitFor(() => expect(getByText('Preencha todos os campos.')).toBeTruthy());
     expect(mockLogin).not.toHaveBeenCalled();
   });
 
   test('exibe erro para e-mail inválido', async () => {
     const { getByPlaceholderText, getByTestId, getByText } = await renderScreen();
-    fireEvent.changeText(getByPlaceholderText('seu@email.com'), 'invalido');
-    fireEvent.changeText(getByTestId('input-password'), 'Password1');
-    fireEvent.press(getByText('ENTRAR'));
+    const user = userEvent.setup();
+    await user.type(getByPlaceholderText('seu@email.com'), 'invalido');
+    await user.type(getByTestId('input-password'), 'Password1');
+    await user.press(getByText('ENTRAR'));
     await waitFor(() => expect(getByText('Formato de e-mail inválido.')).toBeTruthy());
     expect(mockLogin).not.toHaveBeenCalled();
   });
 
   test('chama login com dados válidos', async () => {
     const { getByPlaceholderText, getByTestId, getByText } = await renderScreen();
-    fireEvent.changeText(getByPlaceholderText('seu@email.com'), 'user@test.com');
-    fireEvent.changeText(getByTestId('input-password'), 'Password1');
-    fireEvent.press(getByText('ENTRAR'));
-    await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('user@test.com', 'Password1'));
+    const user = userEvent.setup();
+    await user.type(getByPlaceholderText('seu@email.com'), 'user@test.com');
+    await user.type(getByTestId('input-password'), 'Password1');
+    await user.press(getByText('ENTRAR'));
+    await waitFor(() =>
+      expect(mockLogin).toHaveBeenCalledWith('user@test.com', 'Password1')
+    );
   });
 
   test('exibe erro de credenciais inválidas', async () => {
     mockLogin.mockRejectedValueOnce({ code: 'auth/invalid-credential' });
     const { getByPlaceholderText, getByTestId, getByText } = await renderScreen();
-    fireEvent.changeText(getByPlaceholderText('seu@email.com'), 'user@test.com');
-    fireEvent.changeText(getByTestId('input-password'), 'wrongpass');
-    fireEvent.press(getByText('ENTRAR'));
+    const user = userEvent.setup();
+    await user.type(getByPlaceholderText('seu@email.com'), 'user@test.com');
+    await user.type(getByTestId('input-password'), 'wrongpass');
+    await user.press(getByText('ENTRAR'));
     await waitFor(() => expect(getByText('E-mail ou senha incorretos.')).toBeTruthy());
   });
 });
 
+// ─── Navegação ────────────────────────────────────────────────────────────────
+
 describe('LoginScreen — Navegação', () => {
   test('navega para Register ao tocar em Cadastrar', async () => {
     const { getByTestId } = await renderScreen();
-    fireEvent.press(getByTestId('go-register-btn'));
+    const user = userEvent.setup();
+    await user.press(getByTestId('go-register-btn'));
     expect(mockNavigate).toHaveBeenCalledWith('Register');
   });
 
   test('navega para ForgotPassword', async () => {
     const { getByTestId } = await renderScreen();
-    fireEvent.press(getByTestId('forgot-btn'));
+    const user = userEvent.setup();
+    await user.press(getByTestId('forgot-btn'));
     expect(mockNavigate).toHaveBeenCalledWith('ForgotPassword');
   });
 });
